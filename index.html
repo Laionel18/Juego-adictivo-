@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Esquiva el Neón - Juego Adictivo</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #1a1a1a; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            height: 100vh; 
+            color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            user-select: none;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        #gameCanvas { 
+            background-color: #0d0d0d; 
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1); 
+            border: 2px solid #333; 
+            border-radius: 10px;
+        }
+        #ui { 
+            position: absolute; 
+            top: 20px; 
+            width: 100%;
+            text-align: center; 
+            pointer-events: none; 
+        }
+        h1 { 
+            margin: 0; 
+            font-size: 28px; 
+            color: #00ffff; 
+            text-shadow: 0 0 10px #00ffff;
+        }
+        p { 
+            margin: 5px 0; 
+            font-size: 14px; 
+            color: #888; 
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="ui">
+        <h1><span id="score">0</span></h1>
+        <p id="instructions">← Flechas → o toca los lados</p>
+    </div>
+    <canvas id="gameCanvas" width="400" height="600"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreElement = document.getElementById('score');
+
+    let score = 0;
+    let gameOver = false;
+    let frameCount = 0;
+    let speedMultiplier = 1;
+
+    // Jugador (Cubo Azul)
+    const player = {
+        x: 175,
+        y: 520,
+        width: 40,
+        height: 40,
+        speed: 8,
+        dx: 0
+    };
+
+    let obstacles = [];
+
+    // Controles teclado
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') player.dx = -player.speed;
+        if (e.key === 'ArrowRight') player.dx = player.speed;
+        if ((e.key === ' ' || e.key === 'Enter') && gameOver) resetGame();
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') player.dx = 0;
+    });
+
+    // Controles táctiles (para jugar en el móvil)
+    canvas.addEventListener('touchstart', (e) => {
+        if (gameOver) { resetGame(); return; }
+        const touchX = e.touches[0].clientX;
+        const rect = canvas.getBoundingClientRect();
+        const canvasMiddle = rect.left + rect.width / 2;
+        
+        if (touchX < canvasMiddle) player.dx = -player.speed;
+        else player.dx = player.speed;
+    });
+
+    canvas.addEventListener('touchend', () => { player.dx = 0; });
+    canvas.addEventListener('mousedown', () => { if (gameOver) resetGame(); });
+
+    function createObstacle() {
+        const width = Math.random() * 80 + 30; // Ancho aleatorio entre 30 y 110
+        const x = Math.random() * (canvas.width - width);
+        obstacles.push({ 
+            x: x, 
+            y: -50, 
+            width: width, 
+            height: 20, 
+            speed: (Math.random() * 3 + 4) * speedMultiplier 
+        });
+    }
+
+    function update() {
+        if (gameOver) return;
+
+        // Mover jugador
+        player.x += player.dx;
+        
+        // Límites de la pantalla
+        if (player.x < 0) player.x = 0;
+        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+        // Actualizar obstáculos
+        for (let i = 0; i < obstacles.length; i++) {
+            let obs = obstacles[i];
+            obs.y += obs.speed;
+
+            // Detección de colisiones
+            if (player.x < obs.x + obs.width &&
+                player.x + player.width > obs.x &&
+                player.y < obs.y + obs.height &&
+                player.y + player.height > obs.y) {
+                gameOver = true;
+            }
+
+            // Sumar puntos si el obstáculo sale de la pantalla
+            if (obs.y > canvas.height) {
+                obstacles.splice(i, 1);
+                i--;
+                score += 10;
+                scoreElement.innerText = score;
+            }
+        }
+
+        // Generar nuevos obstáculos
+        frameCount++;
+        let spawnRate = Math.max(15, Math.floor(45 / speedMultiplier));
+        if (frameCount % spawnRate === 0) {
+            createObstacle();
+        }
+
+        // Aumentar la dificultad de forma constante pero sutil
+        speedMultiplier += 0.0005;
+
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Dibujar jugador (Azul Neón)
+        ctx.fillStyle = '#00ffff';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#00ffff';
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        // Dibujar obstáculos (Rojo Neón)
+        ctx.fillStyle = '#ff003c';
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#ff003c';
+        obstacles.forEach(obs => {
+            ctx.fillRect(obs.x, obs.y, obs.width, obs.height);
+        });
+
+        // Limpiar sombra para los textos
+        ctx.shadowBlur = 0; 
+
+        // Pantalla de Game Over
+        if (gameOver) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = '#ff003c';
+            ctx.font = 'bold 40px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('¡CHOCASTE!', canvas.width / 2, canvas.height / 2 - 30);
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '24px Arial';
+            ctx.fillText('Puntuación: ' + score, canvas.width / 2, canvas.height / 2 + 15);
+            
+            ctx.fillStyle = '#888';
+            ctx.font = '16px Arial';
+            ctx.fillText('Toca o presiona Espacio para reiniciar', canvas.width / 2, canvas.height / 2 + 60);
+        }
+    }
+
+    function resetGame() {
+        score = 0;
+        scoreElement.innerText = score;
+        speedMultiplier = 1;
+        obstacles = [];
+        player.x = canvas.width / 2 - player.width / 2;
+        player.dx = 0;
+        gameOver = false;
+        frameCount = 0;
+        update();
+    }
+
+    // Iniciar el juego
+    update();
+</script>
+</body>
+</html>
